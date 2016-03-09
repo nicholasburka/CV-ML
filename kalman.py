@@ -86,14 +86,14 @@ class KalmanFilter:
 	#The Kalman filter relies here on what knowledge it already has
 	def predict(self, control_vec=0):
 		if not self.control:
-			self.predicted_state = np.dot(self.state, self.state_transition_mat)
+			self.predicted_state = np.dot(self.state_transition_mat, self.state)
 		else:
 			self.predicted_state = self.state_transition_mat*self.state + self.control*control_vec
 
 		self.predicted_covariance = np.dot(np.dot(self.state_transition_mat, self.covariance),np.transpose(self.state_transition_mat))
 		#print "Predicted covariance: ", self.predicted_covariance
-
-		#print "predicted cov: ", self.predicted_covariance
+		print "Predicted state: ", self.predicted_state
+		print "Predicted cov: \n", self.predicted_covariance
 		return self.predicted_state, self.predicted_covariance
 
 	#The Kalman filter updates its estimation framework using a new measurement
@@ -103,14 +103,17 @@ class KalmanFilter:
 		#print "pred state: ", self.predicted_state
 		self.error = self.observation_mat.dot(self.predicted_state)
 		self.error = measurement_vec - self.error
-		self.covariance_to_measurement = np.dot(self.observation_mat,np.dot(self.predicted_covariance,np.transpose(self.observation_mat))) + self.estimated_measurement_error
+		print "measurement: ", measurement_vec
+		print "error: ", self.error
+		self.covariance_to_measurement = np.squeeze(np.dot(np.dot(self.observation_mat,self.predicted_covariance),np.transpose(self.observation_mat))) + self.estimated_measurement_error
+		print "cov to meas: ", self.covariance_to_measurement
 
 	def update(self):
 		kalman_gain = np.dot(np.dot(self.covariance, np.transpose(self.observation_mat)),np.linalg.inv(self.covariance_to_measurement))
-		inter = np.squeeze(np.transpose(np.dot(kalman_gain,np.transpose(self.error))))
+		inter = np.squeeze((np.dot(kalman_gain,np.transpose(self.error))))
 		self.state = self.state + inter
-		#print "State: ", self.state
-		self.covariance = np.dot((np.eye(self.predicted_covariance.shape[0]) - np.dot(kalman_gain,self.observation_mat)), self.covariance)
+		print "State: ", self.state
+		self.covariance = np.dot((np.identity(self.predicted_covariance.shape[0]) - np.dot(kalman_gain,self.observation_mat)), self.covariance)
 		#print "Covariance: ", self.covariance
 		return self.state, self.covariance
 
@@ -121,6 +124,7 @@ dim_control = 0 #no known controller
 state_transition_mat = np.identity(4)
 state_transition_mat[0,2] = 1 #these basically say, to get the next state from the current, add dx to x
 state_transition_mat[1,3] = 1 #and dy to y
+print "state trans: ", state_transition_mat
 
 observation_mat = np.zeros((2,4))
 observation_mat[0,0] = 1
@@ -132,8 +136,10 @@ measured = init_state
 k = KalmanFilter(dim_state, dim_measure, dim_control, state_transition_mat, observation_mat, init_state)
 
 for i in range(100):
+	print "\niteration ", i
 	k.predict()
 	k.correct(measured)
 	k.update()
 	measured = measured + np.array([1,0]) + np.random.uniform(low=-.3, high=.3, size=(1,2))
-print k.state, k.covariance
+	#print "measured ", measured
+#print k.state, "\n", k.covariance
